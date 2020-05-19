@@ -3,6 +3,8 @@ use reqwest::header;
 
 use crate::notion::{PublicPageData};
 
+
+#[allow(dead_code)]
 pub fn fetch(endpoint: String, body: String) -> Result<PublicInfo, Error> {
     let client = reqwest::Client::new();
     let url = format!("https://www.notion.so/api/v3/{}", endpoint);
