@@ -1,17 +1,19 @@
 use anyhow::Result;
 use scraper::{Html, Selector};
-use reqwest::Client;
 
 use std::io::Read;
 use std::collections::BTreeSet;
 use std::fs::File;
 use std::path::Path;
 
-struct PreppedHTML {
-    document: Html,
-    selector: Selector,
-    client: Client
+use crate::bookmarks::data::{PreppedHTML, Bookmark};
+
+
+
+pub fn add_bookmark(bookmark: Bookmark) -> Result<()> {
+    Ok(())
 }
+
 
 fn prepare_html(path: &Path) -> Result<PreppedHTML> {
     let mut html_doc = File::open(path)?;
@@ -23,7 +25,7 @@ fn prepare_html(path: &Path) -> Result<PreppedHTML> {
     Ok(PreppedHTML { document, selector, client })
 }
 
-pub fn find_broken_links(path: &Path) -> Result<Vec<&str>> {
+pub fn find_broken_links(path: &Path) -> Result<Vec<String>> {
     let mut borked_links = Vec::new();
     let prep_request = prepare_html(path)?;
     for element in prep_request.document.select(&prep_request.selector) {
@@ -33,11 +35,11 @@ pub fn find_broken_links(path: &Path) -> Result<Vec<&str>> {
             match resp {
                 Ok(res) => {
                     if res.status().as_u16() >= 400 {
-                        borked_links.push(href);
+                        borked_links.push(href.to_owned());
                     }
                 },
-                Err(e) => {
-                    borked_links.push(href);
+                Err(_e) => {
+                    borked_links.push(href.to_owned());
                 }
             }
 
@@ -46,16 +48,16 @@ pub fn find_broken_links(path: &Path) -> Result<Vec<&str>> {
     Ok(borked_links)
 }
 
-pub fn find_duplicate_links(path: &Path) -> Result<Vec<&str>> {
-    let mut dup_links: Vec<&str> = Vec::new();
+pub fn find_duplicate_links(path: &Path) -> Result<Vec<String>> {
+    let mut dup_links: Vec<String> = Vec::new();
     let mut seen_links = BTreeSet::new();
     let prep_request = prepare_html(path)?;
     for element in prep_request.document.select(&prep_request.selector) {
         let href = element.value().attr("href").unwrap();
         if !seen_links.contains(href) {
-            seen_links.insert(href);
+            seen_links.insert(href.to_owned());
         } else {
-            dup_links.push(href);
+            dup_links.push(href.to_owned());
         }
     }
     Ok(dup_links)
