@@ -1,4 +1,5 @@
 use anyhow::Result;
+use reqwest::Client;
 use scraper::{Html, Selector};
 
 use std::io::Read;
@@ -6,8 +7,14 @@ use std::collections::BTreeSet;
 use std::fs::File;
 use std::path::Path;
 
-use crate::bookmarks::data::{PreppedHTML, Bookmark};
+use crate::bookmarks::data::{Bookmark};
 
+
+struct PreppedHTML {
+    pub document: Html,
+    pub selector: Selector,
+    pub client: Client,
+}
 
 
 pub fn add_bookmark(bookmark: Bookmark) -> Result<()> {
