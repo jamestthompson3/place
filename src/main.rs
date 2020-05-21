@@ -1,3 +1,4 @@
+mod bookmarks;
 mod filesystem;
 use filesystem::create_data_dir;
 

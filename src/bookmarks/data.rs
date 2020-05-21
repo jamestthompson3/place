@@ -12,7 +12,6 @@ pub struct Folder {
 
 #[derive(Deserialize, Serialize)]
 pub struct Bookmark {
-    folder: Option<Folder>,
     link: String,
     add_date: u32,
     last_modified: u32,
@@ -49,7 +48,6 @@ impl Bookmark {
         }
 
         let bookmark = Bookmark {
-            folder: None,
             link: link.value().attr("href").unwrap().to_string(),
             add_date: link.value().attr("add_date").unwrap().parse::<u32>()?,
             last_modified: link.value().attr("last_modified").unwrap().parse::<u32>()?,
@@ -66,12 +64,6 @@ mod tests {
     use crate::bookmarks::data::{Bookmark, Folder};
     #[test]
     fn parses_to_html() {
-        let folder = Folder {
-            title: "Test".to_string(),
-            bookmarks: vec![],
-            add_date: 1578165853,
-            last_modified: 1578165853,
-        };
         let bookmark = Bookmark {
         title: "luvit/luv".to_string(),
         tags: Some(vec!["programming".to_string(), "vim".to_string()]),
@@ -79,7 +71,6 @@ mod tests {
         last_modified: 1578165853,
         link: "https://github.com/luvit/luv/blob/master/docs.md#uvspawnfile-options-onexit".to_string(),
         description: "Bare libuv bindings for lua. Contribute to luvit/luv development by creating an account on GitHub.".to_string(),
-            folder: Some(folder)
         };
         let test_string = String::from("<DT><A HREF=\"https://github.com/luvit/luv/blob/master/docs.md#uvspawnfile-options-onexit\" ADD_DATE=\"1578165853\" LAST_MODIFIED=\"1578165853\" TAGS=\"programming,vim\">luvit/luv</A>\n<DD>Bare libuv bindings for lua. Contribute to luvit/luv development by creating an account on GitHub.");
         assert_eq!(bookmark.to_html().unwrap(), test_string);

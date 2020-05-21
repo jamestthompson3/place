@@ -8,6 +8,7 @@ use std::fs::File;
 use std::path::Path;
 
 use crate::bookmarks::data::{Bookmark};
+use crate::filesystem::open_data_file;
 
 
 struct PreppedHTML {
@@ -18,6 +19,7 @@ struct PreppedHTML {
 
 
 pub fn add_bookmark(bookmark: Bookmark) -> Result<()> {
+    let mut bookmark_file = open_data_file("bookmarks.html");
     Ok(())
 }
 
