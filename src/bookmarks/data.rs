@@ -10,14 +10,16 @@ pub struct Folder {
     last_modified: u32,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Bookmark {
-    link: String,
+    location: String,
     add_date: u32,
     last_modified: u32,
     tags: Option<Vec<String>>,
     description: String,
     title: String,
+    references: Option<Vec<String>>,
+    referenced_by: Option<Vec<String>>,
 }
 
 impl Bookmark {
@@ -30,7 +32,12 @@ impl Bookmark {
 
         let bookmark_string = format!(
             "<DT><A HREF=\"{}\" ADD_DATE=\"{}\" LAST_MODIFIED=\"{}\" TAGS=\"{}\">{}</A>\n<DD>{}",
-            self.link, self.add_date, self.last_modified, tag_string, self.title, self.description
+            self.location,
+            self.add_date,
+            self.last_modified,
+            tag_string,
+            self.title,
+            self.description
         );
         Ok(bookmark_string)
     }
@@ -43,17 +50,19 @@ impl Bookmark {
         let tag_attrs = link.value().attr("tags");
         let tags;
         match tag_attrs {
-            Some(attrs) => tags = Some(attrs.split(",").map(|x| x.to_string()).collect()),
+            Some(attrs) => tags = Some(attrs.split(',').map(|x| x.to_string()).collect()),
             _ => tags = None,
         }
 
         let bookmark = Bookmark {
-            link: link.value().attr("href").unwrap().to_string(),
+            location: link.value().attr("href").unwrap().to_string(),
             add_date: link.value().attr("add_date").unwrap().parse::<u32>()?,
             last_modified: link.value().attr("last_modified").unwrap().parse::<u32>()?,
             tags,
             description: description.text().collect::<Vec<_>>().join(" "),
             title: link.text().collect::<Vec<_>>().join(" "),
+            references: None,
+            referenced_by: None,
         };
         Ok(bookmark)
     }
@@ -65,12 +74,14 @@ mod tests {
     #[test]
     fn parses_to_html() {
         let bookmark = Bookmark {
-        title: "luvit/luv".to_string(),
-        tags: Some(vec!["programming".to_string(), "vim".to_string()]),
-        add_date: 1578165853,
-        last_modified: 1578165853,
-        link: "https://github.com/luvit/luv/blob/master/docs.md#uvspawnfile-options-onexit".to_string(),
-        description: "Bare libuv bindings for lua. Contribute to luvit/luv development by creating an account on GitHub.".to_string(),
+            title: "luvit/luv".to_string(),
+            tags: Some(vec!["programming".to_string(), "vim".to_string()]),
+            add_date: 1578165853,
+            last_modified: 1578165853,
+            location: "https://github.com/luvit/luv/blob/master/docs.md#uvspawnfile-options-onexit".to_string(),
+            description: "Bare libuv bindings for lua. Contribute to luvit/luv development by creating an account on GitHub.".to_string(),
+            references: None,
+            referenced_by: None
         };
         let test_string = String::from("<DT><A HREF=\"https://github.com/luvit/luv/blob/master/docs.md#uvspawnfile-options-onexit\" ADD_DATE=\"1578165853\" LAST_MODIFIED=\"1578165853\" TAGS=\"programming,vim\">luvit/luv</A>\n<DD>Bare libuv bindings for lua. Contribute to luvit/luv development by creating an account on GitHub.");
         assert_eq!(bookmark.to_html().unwrap(), test_string);
