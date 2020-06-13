@@ -4,10 +4,10 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
 pub struct Folder {
-    title: String,
-    bookmarks: Vec<Bookmark>,
-    add_date: u32,
-    last_modified: u32,
+    pub title: String,
+    pub bookmarks: Vec<Bookmark>,
+    pub add_date: u32,
+    pub last_modified: u32,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
