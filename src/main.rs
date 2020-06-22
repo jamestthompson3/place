@@ -6,7 +6,7 @@ use std::thread;
 
 fn main() {
     thread::spawn(|| {
-        sharing::listen();
+        sharing::listen().unwrap();
     });
-    sharing::cast();
+    sharing::cast().unwrap();
 }

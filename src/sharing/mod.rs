@@ -2,8 +2,8 @@ use std::io::Result;
 use std::net::UdpSocket;
 use std::net::{Ipv4Addr, SocketAddrV4};
 
-static RECV_ADDRESS: &str = &"127.0.0.1:9777";
-// static INADDR_ANY: &str = &"127.0.0.1:9778";
+static MULTI_CAST_ADDR: &str = &"224.0.0.1";
+// static inaddr_any: &str = &"127.0.0.1:9778";
 
 fn generate_fake_data() -> String {
     let data = r#"
@@ -14,9 +14,12 @@ fn generate_fake_data() -> String {
 }
 
 pub fn listen() -> Result<()> {
-    let INADDR_ANY: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0);
-    let socket = UdpSocket::bind(RECV_ADDRESS)?;
+    let socket_address: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 9778);
+    let multicast_addr = Ipv4Addr::new(224, 0, 0, 1);
+    let bind_addr = Ipv4Addr::new(0, 0, 0, 0);
+    let socket = UdpSocket::bind(socket_address)?;
     println!("Listening on: {}", socket.local_addr().unwrap());
+    socket.join_multicast_v4(&multicast_addr, &bind_addr)?;
     // the message, it will be cut off.
     let mut buf = [0; 60];
 
@@ -31,12 +34,15 @@ pub fn listen() -> Result<()> {
 }
 
 pub fn cast() -> Result<()> {
-    let INADDR_ANY: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0);
+    let socket_address: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0);
+    let multicast_addr = Ipv4Addr::new(224, 0, 0, 1);
+    let bind_addr = Ipv4Addr::new(0, 0, 0, 0);
     // TODO somehow bind it differently?
-    let socket = UdpSocket::bind(INADDR_ANY)?;
-    socket.set_broadcast(true)?;
-    socket.connect(RECV_ADDRESS)?;
+    let socket = UdpSocket::bind(socket_address)?;
+    socket.join_multicast_v4(&multicast_addr, &bind_addr)?;
+    socket.connect(SocketAddrV4::new(multicast_addr, 9778))?;
     let data = generate_fake_data();
     socket.send(data.as_bytes())?;
+    println!("\n[broadcasting at {} ]", socket_address);
     Ok(())
 }
