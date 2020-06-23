@@ -19,7 +19,7 @@ pub fn listen() -> Result<()> {
     println!("Listening on: {}", socket.local_addr().unwrap());
     socket.join_multicast_v4(&MULTI_CAST_ADDR, &bind_addr)?;
     // set up message buffer
-    let mut buf = [0; 60];
+    let mut buf = [0; 120];
 
     let (amt, origin) = socket.recv_from(&mut buf)?;
     let buf = &mut buf[..amt];
