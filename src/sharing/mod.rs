@@ -7,7 +7,8 @@ static MULTI_CAST_ADDR: Ipv4Addr = Ipv4Addr::new(224, 0, 0, 1);
 fn generate_fake_data() -> String {
     let data = r#"
     {
-        "username": "John Doe"
+        "username": "John Doe",
+        "request_state": "1"
     }"#;
     data.to_string()
 }
