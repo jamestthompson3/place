@@ -5,5 +5,5 @@ mod sharing;
 use std::thread;
 
 fn main() {
-    sharing::cast().unwrap();
+    sharing::become_discoverable();
 }
