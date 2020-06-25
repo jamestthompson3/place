@@ -11,8 +11,8 @@ static MULTI_CAST_ADDR: Ipv4Addr = Ipv4Addr::new(224, 0, 0, 1);
 #[repr(u8)]
 pub enum RequestType {
     Idle = 0,
-    Ready = 1,
-    Acknowledged = 2,
+    Ping = 1,
+    Pong = 2,
     Transmitting = 3,
 }
 
@@ -20,8 +20,9 @@ impl ToString for RequestType {
     fn to_string(&self) -> String {
         match self {
             RequestType::Idle => String::from("0"),
-            RequestType::Ready => String::from("1"),
-            RequestType::Transmitting => String::from("2"),
+            RequestType::Ping => String::from("1"),
+            RequestType::Pong => String::from("2"),
+            RequestType::Transmitting => String::from("3"),
         }
     }
 }
