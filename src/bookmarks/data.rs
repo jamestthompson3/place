@@ -70,7 +70,7 @@ impl Bookmark {
 
 #[cfg(test)]
 mod tests {
-    use crate::bookmarks::data::{Bookmark, Folder};
+    use super::*;
     #[test]
     fn parses_to_html() {
         let bookmark = Bookmark {
