@@ -4,6 +4,7 @@ use std::net::UdpSocket;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{thread, time};
+use thiserror::Error;
 
 static MULTI_CAST_ADDR: Ipv4Addr = Ipv4Addr::new(224, 0, 0, 1);
 // Make sure you can only have one PeerCollection at a time
@@ -23,6 +24,19 @@ impl PeerCollection {
             Err(Error::AlreadyInUse)
         }
     }
+    pub fn add_peer(&mut self, peer: String, origin: String) {
+        if !self.found.contains_key(&peer) {
+            self.found.insert(peer, origin);
+        }
+    }
+    pub fn remove_peer(&mut self, peer: &str) {
+        self.found.remove(peer);
+    }
+    pub fn inspect_entries(&self) {
+        for (peer, origin) in &self.found {
+            println!("{} is located {}", peer, origin);
+        }
+    }
 }
 
 impl Drop for PeerCollection {
@@ -32,8 +46,9 @@ impl Drop for PeerCollection {
 }
 
 // The various error cases that may be encountered while using this library.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Error)]
 pub enum Error {
+    #[error("PublicCollection already in use!")]
     AlreadyInUse,
 }
 
@@ -42,6 +57,7 @@ fn generate_fake_data() -> String {
 }
 
 pub fn listen() -> Result<()> {
+    let mut collection = PeerCollection::new().unwrap();
     let socket_address: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 9778);
     let bind_addr = Ipv4Addr::new(0, 0, 0, 0);
     let socket = UdpSocket::bind(socket_address)?;
@@ -55,6 +71,7 @@ pub fn listen() -> Result<()> {
         let buf = &mut buf[..amt];
         let message = String::from_utf8(buf.to_vec()).unwrap();
         println!("{}, {}", message, origin);
+        collection.add_peer(message, origin.to_string());
     }
 }
 
