@@ -79,7 +79,7 @@ pub fn cast() -> Result<()> {
     let socket_address: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0);
     let socket = UdpSocket::bind(socket_address)?;
     // TODO turn this back on when working from multiple PCs
-    // socket.set_multicast_loop_v4(false)?;
+    socket.set_multicast_loop_v4(false)?;
     socket.connect(SocketAddrV4::new(MULTI_CAST_ADDR, 9778))?;
     let data = generate_fake_data();
     println!("\n[broadcasting at {} ]", socket.local_addr().unwrap());
