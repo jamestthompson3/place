@@ -46,17 +46,34 @@ impl Drop for PeerCollection {
     }
 }
 
-pub fn cast() -> Result<()> {
+fn cast() -> Result<()> {
     let socket_address: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0);
     let socket = UdpSocket::bind(socket_address)?;
     // TODO turn this back on when working from multiple PCs
     socket.set_multicast_loop_v4(false)?;
     socket.connect(SocketAddrV4::new(MULTI_CAST_ADDR, 9778))?;
     let data = generate_fake_data();
-    println!("\n[broadcasting at {} ]", socket.local_addr().unwrap());
+    println!("[ broadcasting at {} ]", socket.local_addr().unwrap());
     loop {
         socket.send(data.as_bytes())?;
         thread::sleep(time::Duration::from_secs(2));
+    }
+}
+
+// TODO keep chunks in order
+fn file_listen() -> Result<()> {
+    let socket_address: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 9779);
+    let socket = UdpSocket::bind(socket_address)?;
+    let mut recv_files: HashMap<String, Vec<u64>> = HashMap::new();
+    println!("Listening for files");
+    // set up file buffer
+    loop {
+        let mut buf = [0; 512];
+
+        let (amt, origin) = socket.recv_from(&mut buf)?;
+        let buf = &mut buf[..amt];
+        let message = String::from_utf8(buf.to_vec()).unwrap();
+        println!("{}, {}", message, origin);
     }
 }
 
@@ -65,19 +82,21 @@ pub struct PeerSharing {
     peers: PeerCollection,
 }
 
-// TODO sweep for dropped peers.
+// TODO
+// * sweep for dropped peers.
+// * clean up spawned processes
 impl PeerSharing {
     pub fn new() -> Result<PeerSharing, Error> {
         let collection = PeerCollection::new().unwrap();
         Ok(PeerSharing { peers: collection })
     }
 
-    fn listen(&mut self) -> Result<()> {
+    fn multicast_listen(&mut self) -> Result<()> {
         let socket_address: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 9778);
         let bind_addr = Ipv4Addr::new(0, 0, 0, 0);
         let socket = UdpSocket::bind(socket_address)?;
-        println!("Listening on: {}", socket.local_addr().unwrap());
         socket.join_multicast_v4(&MULTI_CAST_ADDR, &bind_addr)?;
+        println!("Joined multicast group...");
         // set up message buffer
         loop {
             let mut buf = [0; 120];
@@ -94,7 +113,14 @@ impl PeerSharing {
         thread::spawn(|| {
             cast().unwrap();
         });
-        self.listen().unwrap();
+        thread::spawn(|| {
+            file_listen().unwrap();
+        });
+        self.multicast_listen().unwrap();
+    }
+
+    pub fn list_peers(&self) {
+        self.peers.inspect_entries();
     }
 }
 
