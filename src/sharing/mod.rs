@@ -3,13 +3,14 @@ use std::collections::HashMap;
 use std::net::UdpSocket;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::{thread, time};
+use std::{env, thread, time};
 use thiserror::Error;
 
 static MULTI_CAST_ADDR: Ipv4Addr = Ipv4Addr::new(224, 0, 0, 1);
 // Make sure you can only have one PeerCollection at a time
 static PEER_COLLECTION_IN_USE: AtomicBool = AtomicBool::new(false);
 
+#[derive(Debug)]
 pub struct PeerCollection {
     found: HashMap<String, String>,
 }
@@ -45,36 +46,6 @@ impl Drop for PeerCollection {
     }
 }
 
-// The various error cases that may be encountered while using this library.
-#[derive(Debug, Copy, Clone, PartialEq, Error)]
-pub enum Error {
-    #[error("PublicCollection already in use!")]
-    AlreadyInUse,
-}
-
-fn generate_fake_data() -> String {
-    String::from("John Doe")
-}
-
-pub fn listen() -> Result<()> {
-    let mut collection = PeerCollection::new().unwrap();
-    let socket_address: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 9778);
-    let bind_addr = Ipv4Addr::new(0, 0, 0, 0);
-    let socket = UdpSocket::bind(socket_address)?;
-    println!("Listening on: {}", socket.local_addr().unwrap());
-    socket.join_multicast_v4(&MULTI_CAST_ADDR, &bind_addr)?;
-    // set up message buffer
-    loop {
-        let mut buf = [0; 120];
-
-        let (amt, origin) = socket.recv_from(&mut buf)?;
-        let buf = &mut buf[..amt];
-        let message = String::from_utf8(buf.to_vec()).unwrap();
-        println!("{}, {}", message, origin);
-        collection.add_peer(message, origin.to_string());
-    }
-}
-
 pub fn cast() -> Result<()> {
     let socket_address: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0);
     let socket = UdpSocket::bind(socket_address)?;
@@ -89,11 +60,55 @@ pub fn cast() -> Result<()> {
     }
 }
 
-pub fn become_discoverable() {
-    thread::spawn(|| {
-        listen().unwrap();
-    });
-    cast().unwrap();
+#[derive(Debug)]
+pub struct PeerSharing {
+    peers: PeerCollection,
+}
+
+// TODO sweep for dropped peers.
+impl PeerSharing {
+    pub fn new() -> Result<PeerSharing, Error> {
+        let collection = PeerCollection::new().unwrap();
+        Ok(PeerSharing { peers: collection })
+    }
+
+    fn listen(&mut self) -> Result<()> {
+        let socket_address: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 9778);
+        let bind_addr = Ipv4Addr::new(0, 0, 0, 0);
+        let socket = UdpSocket::bind(socket_address)?;
+        println!("Listening on: {}", socket.local_addr().unwrap());
+        socket.join_multicast_v4(&MULTI_CAST_ADDR, &bind_addr)?;
+        // set up message buffer
+        loop {
+            let mut buf = [0; 120];
+
+            let (amt, origin) = socket.recv_from(&mut buf)?;
+            let buf = &mut buf[..amt];
+            let message = String::from_utf8(buf.to_vec()).unwrap();
+            println!("{}, {}", message, origin);
+            self.peers.add_peer(message, origin.to_string());
+        }
+    }
+
+    pub fn make_discoverable(&mut self) {
+        thread::spawn(|| {
+            cast().unwrap();
+        });
+        self.listen().unwrap();
+    }
+}
+
+// The various error cases that may be encountered while using this library.
+#[derive(Debug, Copy, Clone, PartialEq, Error)]
+pub enum Error {
+    #[error("PublicCollection already in use!")]
+    AlreadyInUse,
+}
+
+fn generate_fake_data() -> String {
+    let key = "USER";
+    let val = env::var(key).unwrap();
+    String::from(val)
 }
 
 #[cfg(test)]

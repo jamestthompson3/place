@@ -3,5 +3,6 @@ mod filesystem;
 mod sharing;
 
 fn main() {
-    sharing::become_discoverable();
+    let mut peering = sharing::PeerSharing::new().unwrap();
+    peering.make_discoverable();
 }
