@@ -1,5 +1,10 @@
+use crate::filesystem::open_data_file;
 use anyhow::Result;
 use std::collections::HashMap;
+use std::convert::TryFrom;
+use std::fs;
+use std::fs::File;
+use std::io::prelude::*;
 use std::net::UdpSocket;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -135,6 +140,27 @@ fn generate_fake_data() -> String {
     let key = "USER";
     let val = env::var(key).unwrap();
     String::from(val)
+}
+
+pub fn encode() -> Box<Vec<u8>> {
+    let mut file_handle = open_data_file("test.txt").unwrap();
+    let name = String::from("test.txt");
+    let name_len = name.as_bytes().len();
+    let mut contents = vec![];
+    let mut file_contents = vec![];
+    contents.push(u8::try_from(name_len).unwrap());
+    contents.extend_from_slice(name.as_bytes());
+    file_handle.read_to_end(&mut file_contents).unwrap();
+    contents.extend_from_slice(file_contents.as_slice());
+    Box::new(contents)
+}
+
+pub fn decode(buffer: Box<Vec<u8>>) {
+    let name_len = buffer[0] as usize;
+    let name_bytes = &buffer[1..=name_len];
+    let name_string = String::from_utf8(name_bytes.to_vec()).unwrap();
+    let file = &buffer[name_len + 1..];
+    fs::write(name_string, file).unwrap();
 }
 
 #[cfg(test)]
