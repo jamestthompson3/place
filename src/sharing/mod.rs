@@ -142,6 +142,59 @@ fn generate_fake_data() -> String {
     String::from(val)
 }
 
+#[repr(u8)]
+#[derive(Copy, Clone)]
+pub enum FunType {
+    OPEN = 0,
+    FINISHED = 1,
+    ERR = 2,
+}
+
+trait Byteable {
+    fn to_be_bytes(&self) -> [u8; 1];
+}
+
+impl Byteable for FunType {
+    fn to_be_bytes(&self) -> [u8; 1] {
+        [*self as u8]
+    }
+}
+
+pub struct FunHeader {
+    name_len: u8,
+    name: u8,
+    conn_type: FunType,
+    wnd_size: u32,
+    seq_nr: u16,
+    ack_nr: u16,
+}
+
+impl FunHeader {
+    pub fn serialize(&self) -> Vec<Vec<u8>> {
+        let buffer = vec![
+            self.name_len.to_be_bytes().to_vec(),
+            self.name.to_be_bytes().to_vec(),
+            self.conn_type.to_be_bytes().to_vec(),
+            self.wnd_size.to_be_bytes().to_vec(),
+            self.seq_nr.to_be_bytes().to_vec(),
+            self.ack_nr.to_be_bytes().to_vec(),
+        ];
+        buffer
+    }
+
+    // TODO Don't store everything in the heap
+    // pub fn serialize(&self) -> u32 {
+    //     let buffer = vec![
+    //         self.name_len.to_be_bytes(),
+    //         self.name.to_be_bytes(),
+    //         self.conn_type.to_be_bytes(),
+    //         self.wnd_size.to_be_bytes(),
+    //         self.seq_nr.to_be_bytes(),
+    //         self.ack_nr.to_be_bytes(),
+    //     ];
+    // }
+}
+
 pub fn encode() -> Box<Vec<u8>> {
     let mut file_handle = open_data_file("test.txt").unwrap();
     let name = String::from("test.txt");
