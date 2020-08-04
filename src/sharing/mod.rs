@@ -2,8 +2,8 @@ use crate::filesystem::open_data_file;
 use anyhow::Result;
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::convert::TryInto;
 use std::fs;
-use std::fs::File;
 use std::io::prelude::*;
 use std::net::UdpSocket;
 use std::net::{Ipv4Addr, SocketAddrV4};
@@ -21,13 +21,13 @@ pub struct PeerCollection {
 }
 
 impl PeerCollection {
-    pub fn new() -> Result<PeerCollection, Error> {
+    pub fn new() -> Result<PeerCollection, CollectionError> {
         if PEER_COLLECTION_IN_USE.compare_and_swap(false, true, Ordering::SeqCst) == false {
             Ok(PeerCollection {
                 found: HashMap::new(),
             })
         } else {
-            Err(Error::AlreadyInUse)
+            Err(CollectionError::AlreadyInUse)
         }
     }
     pub fn add_peer(&mut self, peer: String, origin: String) {
@@ -131,7 +131,7 @@ impl PeerSharing {
 
 // The various error cases that may be encountered while using this library.
 #[derive(Debug, Copy, Clone, PartialEq, Error)]
-pub enum Error {
+pub enum CollectionError {
     #[error("PublicCollection already in use!")]
     AlreadyInUse,
 }
@@ -150,6 +150,12 @@ pub enum FunType {
     ERR = 2,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Error)]
+pub enum SerializerErrors {
+    #[error("Invalid bytes found while parsing")]
+    InvalidBytes,
+}
+
 trait Byteable {
     fn to_be_bytes(&self) -> [u8; 1];
 }
@@ -157,6 +163,18 @@ trait Byteable {
 impl Byteable for FunType {
     fn to_be_bytes(&self) -> [u8; 1] {
         [*self as u8]
+    }
+}
+
+impl TryFrom<u8> for FunType {
+    type Error = SerializerErrors;
+    fn try_from(v: u8) -> Result<Self, SerializerErrors> {
+        match v {
+            x if x == FunType::OPEN as u8 => Ok(FunType::OPEN),
+            x if x == FunType::FINISHED as u8 => Ok(FunType::FINISHED),
+            x if x == FunType::ERR as u8 => Ok(FunType::ERR),
+            _ => Err(SerializerErrors::InvalidBytes),
+        }
     }
 }
 
@@ -180,6 +198,43 @@ impl FunHeader {
             self.ack_nr.to_be_bytes().to_vec(),
         ];
         buffer
+    }
+    pub fn deserialize(&mut self, ser_header: Vec<Vec<u8>>) -> Result<FunHeader, SerializerErrors> {
+        let mut header = ser_header.iter();
+        self.name_len = self.match_as_u8(header.next())?;
+        self.name = self.match_as_u8(header.next())?;
+        self.conn_type = self.match_as_u8(header.next())?.try_into()?;
+        self.wnd_size = self.match_as_u32(header.next())?;
+        self.seq_nr = self.match_as_u16(header.next())?;
+        self.ack_nr = self.match_as_u16(header.next())?;
+        return Ok(*self);
+    }
+    fn match_as_u8(&self, value: Option<&Vec<u8>>) -> Result<u8, SerializerErrors> {
+        match value {
+            Some(num) => {
+                let num_slice = num.as_slice();
+                return Ok(u8::from_ne_bytes(num_slice.try_into().unwrap()));
+            }
+            None => return Err(SerializerErrors::InvalidBytes),
+        };
+    }
+    fn match_as_u32(&self, value: Option<&Vec<u8>>) -> Result<u32, SerializerErrors> {
+        match value {
+            Some(num) => {
+                let num_slice = num.as_slice();
+                return Ok(u32::from_ne_bytes(num_slice.try_into().unwrap()));
+            }
+            None => return Err(SerializerErrors::InvalidBytes),
+        };
+    }
+    fn match_as_u16(&self, value: Option<&Vec<u8>>) -> Result<u16, SerializerErrors> {
+        match value {
+            Some(num) => {
+                let num_slice = num.as_slice();
+                return Ok(u16::from_ne_bytes(num_slice.try_into().unwrap()));
+            }
+            None => return Err(SerializerErrors::InvalidBytes),
+        };
     }
 
     // TODO Don't store everything in the heap
