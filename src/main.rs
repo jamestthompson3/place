@@ -5,6 +5,6 @@ mod sharing;
 fn main() {
     // let mut peering = sharing::PeerSharing::new().unwrap();
     // peering.make_discoverable();
-    let fname = sharing::encode();
-    sharing::decode(fname);
+    let fname = sharing::protocol::encode();
+    sharing::protocol::decode(fname);
 }
