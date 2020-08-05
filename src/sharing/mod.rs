@@ -91,7 +91,7 @@ pub struct PeerSharing {
 // * sweep for dropped peers.
 // * clean up spawned processes
 impl PeerSharing {
-    pub fn new() -> Result<PeerSharing, Error> {
+    pub fn new() -> Result<PeerSharing, CollectionError> {
         let collection = PeerCollection::new().unwrap();
         Ok(PeerSharing { peers: collection })
     }
@@ -143,7 +143,7 @@ fn generate_fake_data() -> String {
 }
 
 #[repr(u8)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum FunType {
     OPEN = 0,
     FINISHED = 1,
@@ -178,9 +178,10 @@ impl TryFrom<u8> for FunType {
     }
 }
 
+#[derive(Debug)]
 pub struct FunHeader {
     name_len: u8,
-    name: u8,
+    name: Vec<u8>,
     conn_type: FunType,
     wnd_size: u32,
     seq_nr: u16,
@@ -191,7 +192,7 @@ impl FunHeader {
     pub fn serialize(&self) -> Vec<Vec<u8>> {
         let buffer = vec![
             self.name_len.to_be_bytes().to_vec(),
-            self.name.to_be_bytes().to_vec(),
+            self.name.to_vec(),
             self.conn_type.to_be_bytes().to_vec(),
             self.wnd_size.to_be_bytes().to_vec(),
             self.seq_nr.to_be_bytes().to_vec(),
@@ -199,21 +200,51 @@ impl FunHeader {
         ];
         buffer
     }
-    pub fn deserialize(&mut self, ser_header: Vec<Vec<u8>>) -> Result<FunHeader, SerializerErrors> {
+    pub fn new(
+        name_len: u8,
+        name: Vec<u8>,
+        conn_type: FunType,
+        wnd_size: u32,
+        seq_nr: u16,
+        ack_nr: u16,
+    ) -> FunHeader {
+        FunHeader {
+            name_len,
+            name,
+            conn_type,
+            wnd_size,
+            seq_nr,
+            ack_nr,
+        }
+    }
+    pub fn deserialize(&self, ser_header: Vec<Vec<u8>>) -> Result<FunHeader, SerializerErrors> {
         let mut header = ser_header.iter();
-        self.name_len = self.match_as_u8(header.next())?;
-        self.name = self.match_as_u8(header.next())?;
-        self.conn_type = self.match_as_u8(header.next())?.try_into()?;
-        self.wnd_size = self.match_as_u32(header.next())?;
-        self.seq_nr = self.match_as_u16(header.next())?;
-        self.ack_nr = self.match_as_u16(header.next())?;
-        return Ok(*self);
+        let name_len = self.match_as_u8(header.next())?;
+        let name = self.match_as_byte_array(header.next())?;
+        let conn_type = self.match_as_u8(header.next())?.try_into()?;
+        let wnd_size = self.match_as_u32(header.next())?;
+        let seq_nr = self.match_as_u16(header.next())?;
+        let ack_nr = self.match_as_u16(header.next())?;
+        return Ok(FunHeader {
+            name_len,
+            name,
+            conn_type,
+            wnd_size,
+            seq_nr,
+            ack_nr,
+        });
+    }
+    fn match_as_byte_array(&self, value: Option<&Vec<u8>>) -> Result<Vec<u8>, SerializerErrors> {
+        match value {
+            Some(byte_array) => return Ok(byte_array.to_vec()),
+            None => return Err(SerializerErrors::InvalidBytes),
+        }
     }
     fn match_as_u8(&self, value: Option<&Vec<u8>>) -> Result<u8, SerializerErrors> {
         match value {
             Some(num) => {
                 let num_slice = num.as_slice();
-                return Ok(u8::from_ne_bytes(num_slice.try_into().unwrap()));
+                return Ok(u8::from_be_bytes(num_slice.try_into().unwrap()));
             }
             None => return Err(SerializerErrors::InvalidBytes),
         };
@@ -222,7 +253,7 @@ impl FunHeader {
         match value {
             Some(num) => {
                 let num_slice = num.as_slice();
-                return Ok(u32::from_ne_bytes(num_slice.try_into().unwrap()));
+                return Ok(u32::from_be_bytes(num_slice.try_into().unwrap()));
             }
             None => return Err(SerializerErrors::InvalidBytes),
         };
@@ -231,7 +262,7 @@ impl FunHeader {
         match value {
             Some(num) => {
                 let num_slice = num.as_slice();
-                return Ok(u16::from_ne_bytes(num_slice.try_into().unwrap()));
+                return Ok(u16::from_be_bytes(num_slice.try_into().unwrap()));
             }
             None => return Err(SerializerErrors::InvalidBytes),
         };
@@ -287,5 +318,39 @@ mod tests {
         assert!(!PEER_COLLECTION_IN_USE.load(Ordering::SeqCst));
 
         let _another = PeerCollection::new().unwrap();
+    }
+    #[test]
+    fn can_serialize_and_serialize_fun_headers() {
+        let mut file_handle = open_data_file("test.txt").unwrap();
+        let name = String::from("test.txt");
+        let name_len = u8::try_from(name.as_bytes().len()).unwrap();
+        let conn_type = FunType::OPEN;
+        let mut file_contents = vec![];
+        file_handle.read_to_end(&mut file_contents).unwrap();
+        let wnd_size = u32::try_from(file_contents.len()).unwrap();
+        let seq_nr = 1;
+        let ack_nr = 1;
+        let test_header = FunHeader::new(
+            name_len,
+            name.as_bytes().to_vec(),
+            conn_type,
+            wnd_size,
+            seq_nr,
+            ack_nr,
+        );
+
+        // Make sure we load things as expected
+        assert_eq!(test_header.wnd_size, 10);
+        assert_eq!(
+            String::from_utf8(test_header.name.to_vec()).unwrap(),
+            "test.txt"
+        );
+
+        let serialized_header = test_header.serialize();
+        let deserialize_header = test_header.deserialize(serialized_header).unwrap();
+        assert_eq!(
+            format!("{:?}", deserialize_header),
+            format!("{:?}", test_header)
+        );
     }
 }
